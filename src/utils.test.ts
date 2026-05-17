@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
-import { BumpLevels, getChangelogEntry, sortTheThings } from "./utils.ts";
+import { BumpLevels, getChangelogEntry } from "./changelog.ts";
+import { sortTheThings } from "./utils.ts";
 
 const changelog = `# @keystone-alpha/email
 

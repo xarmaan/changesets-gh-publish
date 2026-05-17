@@ -1,6 +1,10 @@
 import * as path from "node:path";
 import * as core from "@actions/core";
 import * as github from "@actions/github";
+import {
+  GITHUB_ACTIONS_BOT_USER_EMAIL,
+  GITHUB_ACTIONS_BOT_USER_NAME,
+} from "./constants.ts";
 import { Git } from "./git.ts";
 import { type Octokit, setupOctokit } from "./octokit.ts";
 
@@ -82,8 +86,8 @@ function getInputs(
   if (!userName && userEmail) {
     throw new Error('"user_name" must be provided together with "user_email"');
   }
-  userName ||= "github-actions[bot]";
-  userEmail ||= "41898282+github-actions[bot]@users.noreply.github.com";
+  userName ||= GITHUB_ACTIONS_BOT_USER_NAME;
+  userEmail ||= GITHUB_ACTIONS_BOT_USER_EMAIL;
 
   const publish = optional(input("publish"));
 

@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as core from "@actions/core";
-import { readChangesetState } from "./changeset.ts";
+import { readChangesetState } from "./changesets.ts";
 import { ActionContext } from "./context.ts";
 import { runGitHubPublish, runScriptPublish } from "./publish.ts";
 import { fileExists } from "./utils.ts";

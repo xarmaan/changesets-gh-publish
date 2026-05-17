@@ -7,12 +7,14 @@ import * as io from "@actions/io";
 import { read } from "@changesets/config";
 import { getPackages, type Package } from "@manypkg/get-packages";
 import { packlist } from "@pnpm/fs.packlist";
-import { type DetectResult, detect } from "package-manager-detector";
+import { detect } from "package-manager-detector";
 import * as tar from "tar";
+import { getChangelogEntry } from "./changelog.ts";
 import type { ActionContext } from "./context.ts";
 import { remoteHeadExists, remoteTagList, setUser } from "./git-utils.ts";
 import { type Octokit, setupOctokit } from "./octokit.ts";
-import { fileExists, getChangelogEntry, isErrorWithCode } from "./utils.ts";
+import { packPackage } from "./pack.ts";
+import { getGitHubRemoteUrl, isErrorWithCode } from "./utils.ts";
 
 async function createRelease(
   octokit: Octokit,
@@ -56,13 +58,8 @@ async function createRelease(
 type PublishedPackage = { name: string; version: string };
 
 type PublishResult =
-  | {
-      published: true;
-      publishedPackages: PublishedPackage[];
-    }
-  | {
-      published: false;
-    };
+  | { published: true; publishedPackages: PublishedPackage[] }
+  | { published: false };
 
 export async function runScriptPublish(
   script: string,
@@ -120,7 +117,7 @@ export async function runScriptPublish(
   } else {
     if (packages.length === 0) {
       throw new Error(
-        `No package found.` +
+        "No package found." +
           "This is probably a bug in the action, please open an issue",
       );
     }
@@ -166,18 +163,14 @@ export async function runGitHubPublish(
 
   const config = await read(ctx.cwd, { packages, tool, root: packagesRoot });
 
-  let pm: DetectResult | null = null;
-
-  try {
-    pm = await detect({ cwd: ctx.cwd });
-  } catch (_) {}
+  const pm = await detect({ cwd: ctx.cwd }).catch(() => null);
 
   if (!pm) {
     core.warning("[WARN] could not detect package manager");
   } else if (pm.agent === "pnpm" || pm.agent === "npm") {
     core.info(`[INFO] detected package manager: ${pm.agent}`);
   } else {
-    core.warning(`[WARN] detected unsupported package manager: ${pm.agent}`);
+    core.warning(`[WARN] unsupported package manager: ${pm.agent}`);
   }
 
   const workDir = path.resolve(
@@ -210,202 +203,159 @@ export async function runGitHubPublish(
 
   core.info(`[INFO] created temp directory: ${workDir}`);
 
-  try {
-    await exec("git", ["init"], { cwd: gitDir });
-    await exec("git", ["remote", "add", "origin", remoteUrl], { cwd: gitDir });
-    await setUser(userName, userEmail, gitDir);
+  await exec("git", ["init"], { cwd: gitDir });
+  await exec("git", ["remote", "add", "origin", remoteUrl], { cwd: gitDir });
+  await setUser(userName, userEmail, gitDir);
 
-    if (packages.length === 0) {
-      if (tool === "root") {
-        throw new Error(
-          `No package found.` +
-            "This is probably a bug in the action, please open an issue",
-        );
-      } else {
-        return { published: false };
-      }
-    }
-
-    await Promise.all(
-      packages.map(async (pkg) => {
-        const tag =
-          tool !== "root"
-            ? `${pkg.packageJson.name}@${pkg.packageJson.version}`
-            : `v${pkg.packageJson.version}`;
-        const checkTagCode = await exec(
-          "git",
-          ["check-ref-format", `refs/tags/${tag}`],
-          {
-            cwd: gitDir,
-            ignoreReturnCode: true,
-          },
-        );
-        if (checkTagCode !== 0) {
-          throw new Error(
-            `Invalid Git tag name "${tag}" generated from package "${pkg.packageJson.name}".`,
-          );
-        }
-      }),
-    );
-
-    const repoFound =
-      (await remoteHeadExists(gitDir)) ||
-      (await octokit.rest.repos
-        .get({
-          owner: repositoryOwner,
-          repo: repositoryRepo,
-        })
-        .catch((err) => {
-          if (err?.status === 404 || err?.status === 403) {
-            return false;
-          }
-          throw err;
-        }));
-    if (!repoFound) {
+  if (packages.length === 0) {
+    if (tool === "root") {
       throw new Error(
-        `Repository ${repository} does not exist or is inaccessible.`,
+        "No package found." +
+          "This is probably a bug in the action, please open an issue",
       );
-    }
-    core.info(`[INFO] repository accessible: ${repository}`);
-
-    const remoteTags = await remoteTagList(gitDir);
-
-    const packagesInfo = await Promise.all(
-      packages.map<Promise<Package & { tag: string; published: boolean }>>(
-        async (pkg) => {
-          const tag =
-            tool !== "root"
-              ? `${pkg.packageJson.name}@${pkg.packageJson.version}`
-              : `v${pkg.packageJson.version}`;
-          return {
-            ...pkg,
-            tag,
-            published: remoteTags.has(tag),
-          };
-        },
-      ),
-    );
-
-    const packagesToPublish = packagesInfo.filter((pkg) => {
-      if (pkg.packageJson.private && !config?.privatePackages?.tag) {
-        return false;
-      }
-      return !pkg.published;
-    });
-
-    if (packagesToPublish.length === 0) {
+    } else {
       return { published: false };
     }
+  }
 
-    for (const pkg of packagesToPublish) {
-      await exec("git", ["checkout", "--orphan", `temp/${pkg.tag}`], {
-        cwd: gitDir,
-      });
-      await exec("git", ["clean", "-fdx"], { cwd: gitDir });
+  await Promise.all(
+    packages.map(async (pkg) => {
+      const tag =
+        tool !== "root"
+          ? `${pkg.packageJson.name}@${pkg.packageJson.version}`
+          : `v${pkg.packageJson.version}`;
+      const checkTagCode = await exec(
+        "git",
+        ["check-ref-format", `refs/tags/${tag}`],
+        {
+          cwd: gitDir,
+          ignoreReturnCode: true,
+        },
+      );
+      if (checkTagCode !== 0) {
+        throw new Error(
+          `Invalid Git tag name "${tag}" generated from package "${pkg.packageJson.name}".`,
+        );
+      }
+    }),
+  );
 
-      if (pm?.agent === "pnpm" || pm?.agent === "npm") {
-        const tarball = await packPackage(pm.agent, pkg.dir, packsDir);
+  const repoFound =
+    (await remoteHeadExists(gitDir)) ||
+    (await octokit.rest.repos
+      .get({
+        owner: repositoryOwner,
+        repo: repositoryRepo,
+      })
+      .catch((err) => {
+        if (err?.status === 404 || err?.status === 403) {
+          return false;
+        }
+        throw err;
+      }));
+  if (!repoFound) {
+    throw new Error(
+      `Repository ${repository} does not exist or is inaccessible.`,
+    );
+  }
+  core.info(`[INFO] repository accessible: ${repository}`);
+
+  core.startGroup("Fetching remote tags");
+  const remoteTags = await remoteTagList(gitDir);
+  core.endGroup();
+
+  const packagesInfo = packages.map<
+    Package & { tag: string; published: boolean }
+  >((pkg) => {
+    const tag =
+      tool !== "root"
+        ? `${pkg.packageJson.name}@${pkg.packageJson.version}`
+        : `v${pkg.packageJson.version}`;
+    return {
+      ...pkg,
+      tag,
+      published: remoteTags.has(tag),
+    };
+  });
+
+  const packagesToPublish = packagesInfo.filter((pkg) => {
+    if (pkg.packageJson.private && !config?.privatePackages?.tag) {
+      return false;
+    }
+    return !pkg.published;
+  });
+
+  if (packagesToPublish.length === 0) {
+    return { published: false };
+  }
+
+  for (const pkg of packagesToPublish) {
+    await exec("git", ["checkout", "--orphan", `temp/${pkg.tag}`], {
+      cwd: gitDir,
+    });
+    await exec("git", ["clean", "-fdx"], { cwd: gitDir });
+
+    if (pm?.agent === "pnpm" || pm?.agent === "npm") {
+      const tarball = await packPackage(pm.agent, pkg.dir, packsDir);
+      try {
         await tar.x({
           file: tarball,
           cwd: gitDir,
           strip: 1,
         });
-      } else {
-        const files = await packlist(pkg.dir);
-
-        await Promise.all(
-          files.map(async (file) => {
-            const src = path.join(pkg.dir, file);
-            const dest = path.join(gitDir, file);
-            await io.mkdirP(path.dirname(dest));
-            await fs.copyFile(src, dest);
-          }),
-        );
+      } finally {
+        await fs.unlink(tarball);
       }
+    } else {
+      const files = await packlist(pkg.dir);
 
-      await exec("git", ["add", "."], {
-        cwd: gitDir,
-      });
-
-      await exec("git", ["commit", "--allow-empty", "--message", pkg.tag], {
-        cwd: gitDir,
-      });
-
-      await exec("git", ["tag", "--annotate", pkg.tag, "--message", pkg.tag], {
-        cwd: gitDir,
-      });
-    }
-
-    await exec(
-      "git",
-      ["push", "origin", ...packagesToPublish.map((pkg) => pkg.tag)],
-      { cwd: gitDir },
-    );
-
-    if (ctx.inputs.createGithubReleases) {
       await Promise.all(
-        packagesToPublish.map(async (pkg) => {
-          return createRelease(octokit, {
-            owner: repositoryOwner,
-            repo: repositoryRepo,
-            pkg,
-            tagName: pkg.tag,
-          });
+        files.map(async (file) => {
+          const src = path.join(pkg.dir, file);
+          const dest = path.join(gitDir, file);
+          await io.mkdirP(path.dirname(dest));
+          await fs.copyFile(src, dest);
         }),
       );
     }
 
-    return {
-      published: true,
-      publishedPackages: packagesToPublish.map((pkg) => ({
-        name: pkg.packageJson.name,
-        version: pkg.packageJson.version,
-      })),
-    };
-  } finally {
-    await io.rmRF(gitDir);
+    await exec("git", ["add", "."], {
+      cwd: gitDir,
+    });
+
+    await exec("git", ["commit", "--allow-empty", "--message", pkg.tag], {
+      cwd: gitDir,
+    });
+
+    await exec("git", ["tag", "--annotate", pkg.tag, "--message", pkg.tag], {
+      cwd: gitDir,
+    });
   }
 
-  return { published: false };
-}
-
-function getGitHubRemoteUrl(githubToken: string, repository: string): string {
-  const serverUrl = new URL(
-    process.env["GITHUB_SERVER_URL"] || "https://github.com",
-  );
-  return `https://x-access-token:${githubToken}@${serverUrl.host}/${repository}.git`;
-}
-
-async function packPackage(
-  pm: "npm" | "pnpm",
-  pkgDir: string,
-  destDir: string,
-): Promise<string> {
-  const { stdout } = await getExecOutput(
-    pm,
-    ["pack", "--json", "--pack-destination", destDir],
-    {
-      cwd: pkgDir,
-    },
+  await exec(
+    "git",
+    ["push", "origin", ...packagesToPublish.map((pkg) => pkg.tag)],
+    { cwd: gitDir },
   );
 
-  const output = JSON.parse(stdout) as
-    | { filename?: string }
-    | { filename?: string }[];
-
-  const filename = Array.isArray(output)
-    ? output[0]?.filename
-    : output?.filename;
-
-  if (typeof filename !== "string") {
-    throw new Error(`Failed to create package tarball for ${pkgDir}`);
+  if (ctx.inputs.createGithubReleases) {
+    await Promise.all(
+      packagesToPublish.map(async (pkg) => {
+        return createRelease(octokit, {
+          owner: repositoryOwner,
+          repo: repositoryRepo,
+          pkg,
+          tagName: pkg.tag,
+        });
+      }),
+    );
   }
 
-  const file = path.resolve(destDir, filename);
-
-  if (!(await fileExists(file))) {
-    throw new Error(`Packed tarball not found: ${file}`);
-  }
-
-  return file;
+  return {
+    published: true,
+    publishedPackages: packagesToPublish.map((pkg) => ({
+      name: pkg.packageJson.name,
+      version: pkg.packageJson.version,
+    })),
+  };
 }

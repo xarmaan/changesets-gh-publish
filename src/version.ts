@@ -1,50 +1,22 @@
 import * as fs from "node:fs/promises";
-import { createRequire } from "node:module";
 import * as path from "node:path";
 import * as core from "@actions/core";
 import { exec } from "@actions/exec";
 import * as github from "@actions/github";
 import type { PreState } from "@changesets/types";
 import semverLt from "semver/functions/lt.js";
-import { readChangesetState } from "./changeset.ts";
+import { BumpLevels, getChangelogEntry } from "./changelog.ts";
+import {
+  readChangesetState,
+  requireChangesetsCliPkgJson,
+} from "./changesets.ts";
+import { MAX_CHARACTERS_PER_MESSAGE } from "./constants.ts";
 import type { ActionContext } from "./context.ts";
 import {
-  BumpLevels,
   getChangedPackages,
-  getChangelogEntry,
   getVersionsByDirectory,
-  isErrorWithCode,
   sortTheThings,
 } from "./utils.ts";
-
-const require = createRequire(import.meta.url);
-
-// GitHub Issues/PRs messages have a max size limit on the
-// message body payload.
-// `body is too long (maximum is 65536 characters)`.
-// To avoid that, we ensure to cap the message to 60k chars.
-const MAX_CHARACTERS_PER_MESSAGE = 60000;
-
-function requireChangesetsCliPkgJson(cwd: string): {
-  name: string;
-  version: string;
-} {
-  try {
-    return require(
-      require.resolve("@changesets/cli/package.json", {
-        paths: [cwd],
-      }),
-    );
-  } catch (err) {
-    if (isErrorWithCode(err, "MODULE_NOT_FOUND")) {
-      throw new Error(
-        `Have you forgotten to install \`@changesets/cli\` in "${cwd}"?`,
-        { cause: err },
-      );
-    }
-    throw err;
-  }
-}
 
 type GetMessageOptions = {
   publishScript: string | undefined;
