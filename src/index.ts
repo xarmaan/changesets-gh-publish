@@ -124,7 +124,7 @@ import { runVersion } from "./version.ts";
     case hasChangesets: {
       const { pullRequestNumber } = await runVersion(ctx, {
         script: ctx.inputs.version,
-        hasPublishScript,
+        publishScript,
       });
 
       core.setOutput("pull_request_number", String(pullRequestNumber));
