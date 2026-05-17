@@ -4,6 +4,7 @@ import * as core from "@actions/core";
 import { exec, getExecOutput } from "@actions/exec";
 import * as github from "@actions/github";
 import * as io from "@actions/io";
+import { read } from "@changesets/config";
 import { getPackages, type Package } from "@manypkg/get-packages";
 import { packlist } from "@pnpm/fs.packlist";
 import { type DetectResult, detect } from "package-manager-detector";
@@ -161,6 +162,10 @@ export async function runScriptPublish(
 export async function runGitHubPublish(
   ctx: ActionContext,
 ): Promise<PublishResult> {
+  const { packages, tool, root: packagesRoot } = await getPackages(ctx.cwd);
+
+  const config = await read(ctx.cwd, { packages, tool, root: packagesRoot });
+
   let pm: DetectResult | null = null;
 
   try {
@@ -209,8 +214,6 @@ export async function runGitHubPublish(
     await exec("git", ["init"], { cwd: gitDir });
     await exec("git", ["remote", "add", "origin", remoteUrl], { cwd: gitDir });
     await setUser(userName, userEmail, gitDir);
-
-    const { packages, tool } = await getPackages(ctx.cwd);
 
     if (packages.length === 0) {
       if (tool === "root") {
@@ -283,7 +286,12 @@ export async function runGitHubPublish(
       ),
     );
 
-    const packagesToPublish = packagesInfo.filter((pkg) => !pkg.published);
+    const packagesToPublish = packagesInfo.filter((pkg) => {
+      if (pkg.packageJson.private && !config?.privatePackages?.tag) {
+        return false;
+      }
+      return !pkg.published;
+    });
 
     if (packagesToPublish.length === 0) {
       return { published: false };
