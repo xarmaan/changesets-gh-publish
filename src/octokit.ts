@@ -9,7 +9,7 @@ export function setupOctokit(githubToken: string) {
       throttle: {
         onRateLimit: (retryAfter, options: any, octokit, retryCount) => {
           core.warning(
-            `[WARN] Request quota exhausted for request ${options.method} ${options.url}`
+            `[WARN] Request quota exhausted for request ${options.method} ${options.url}`,
           );
 
           if (retryCount <= 2) {
@@ -21,10 +21,10 @@ export function setupOctokit(githubToken: string) {
           retryAfter,
           options: any,
           octokit,
-          retryCount
+          retryCount,
         ) => {
           core.warning(
-            `[WARN] SecondaryRateLimit detected for request ${options.method} ${options.url}`
+            `[WARN] SecondaryRateLimit detected for request ${options.method} ${options.url}`,
           );
 
           if (retryCount <= 2) {
@@ -34,7 +34,7 @@ export function setupOctokit(githubToken: string) {
         },
       },
     },
-    throttling
+    throttling,
   );
 }
 

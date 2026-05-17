@@ -40,7 +40,7 @@ const f = fixturez(import.meta.dirname);
 const linkNodeModules = async (cwd: string) => {
   await fs.symlink(
     path.join(import.meta.dirname, "..", "node_modules"),
-    path.join(cwd, "node_modules")
+    path.join(cwd, "node_modules"),
   );
 };
 const writeChangesets = (changesets: Changeset[], cwd: string) => {
@@ -78,7 +78,7 @@ describe("version", () => {
           summary: "Awesome feature",
         },
       ],
-      cwd
+      cwd,
     );
 
     const ctx = new ActionContext({
@@ -120,7 +120,7 @@ describe("version", () => {
           summary: "Awesome feature",
         },
       ],
-      cwd
+      cwd,
     );
 
     const ctx = new ActionContext({
@@ -164,7 +164,7 @@ describe("version", () => {
           summary: "Awesome feature",
         },
       ],
-      cwd
+      cwd,
     );
 
     const ctx = new ActionContext({
@@ -206,7 +206,7 @@ describe("version", () => {
           summary: "Awesome feature",
         },
       ],
-      cwd
+      cwd,
     );
 
     const ctx = new ActionContext({
@@ -268,7 +268,7 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
 `,
         },
       ],
-      cwd
+      cwd,
     );
 
     const ctx = new ActionContext({
@@ -287,7 +287,7 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
 
     expect(mockedGithubMethods.pulls.create.mock.calls[0]).toMatchSnapshot();
     expect(mockedGithubMethods.pulls.create.mock.calls[0][0].body).toMatch(
-      /The changelog information of each package has been omitted from this message/
+      /The changelog information of each package has been omitted from this message/,
     );
   });
 
@@ -333,7 +333,7 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
 `,
         },
       ],
-      cwd
+      cwd,
     );
 
     const ctx = new ActionContext({
@@ -352,7 +352,7 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
 
     expect(mockedGithubMethods.pulls.create.mock.calls[0]).toMatchSnapshot();
     expect(mockedGithubMethods.pulls.create.mock.calls[0][0].body).toMatch(
-      /All release information have been omitted from this message, as the content exceeds the size limit/
+      /All release information have been omitted from this message, as the content exceeds the size limit/,
     );
   });
 
@@ -376,7 +376,7 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
           summary: "Awesome feature",
         },
       ],
-      cwd
+      cwd,
     );
 
     const ctx = new ActionContext({
@@ -418,7 +418,7 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
           summary: "Awesome feature",
         },
       ],
-      cwd
+      cwd,
     );
 
     const ctx = new ActionContext({

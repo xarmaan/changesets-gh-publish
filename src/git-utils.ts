@@ -3,7 +3,7 @@ import { exec, getExecOutput } from "@actions/exec";
 export async function setUser(
   name: string,
   email: string,
-  cwd: string
+  cwd: string,
 ): Promise<void> {
   await exec("git", ["config", "user.name", name], {
     cwd,
@@ -25,14 +25,14 @@ export async function remoteHeadExists(cwd: string): Promise<boolean> {
     {
       cwd,
       ignoreReturnCode: true,
-    }
+    },
   );
   return exitCode === 0;
 }
 
 export async function remoteBranchExists(
   branch: string,
-  cwd: string
+  cwd: string,
 ): Promise<boolean> {
   const exitCode = await exec(
     "git",
@@ -40,7 +40,7 @@ export async function remoteBranchExists(
     {
       cwd,
       ignoreReturnCode: true,
-    }
+    },
   );
   return exitCode === 0;
 }
@@ -54,7 +54,7 @@ export async function remoteTagList(cwd: string): Promise<Map<string, string>> {
     {
       cwd,
       ignoreReturnCode: true,
-    }
+    },
   );
   if (exitCode !== 0) {
     return map;
@@ -74,7 +74,7 @@ export async function remoteTagList(cwd: string): Promise<Map<string, string>> {
 
 export async function remoteTagExists(
   tag: string,
-  cwd: string
+  cwd: string,
 ): Promise<boolean> {
   const exitCode = await exec(
     "git",
@@ -82,7 +82,7 @@ export async function remoteTagExists(
     {
       cwd,
       ignoreReturnCode: true,
-    }
+    },
   );
   return exitCode === 0;
 }

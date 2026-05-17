@@ -30,14 +30,16 @@ function requireChangesetsCliPkgJson(cwd: string): {
   version: string;
 } {
   try {
-    return require(require.resolve("@changesets/cli/package.json", {
-      paths: [cwd],
-    }));
+    return require(
+      require.resolve("@changesets/cli/package.json", {
+        paths: [cwd],
+      }),
+    );
   } catch (err) {
     if (isErrorWithCode(err, "MODULE_NOT_FOUND")) {
       throw new Error(
         `Have you forgotten to install \`@changesets/cli\` in "${cwd}"?`,
-        { cause: err }
+        { cause: err },
       );
     }
     throw err;
@@ -127,7 +129,7 @@ export async function runVersion(
     script?: string;
     hasPublishScript?: boolean;
     prBodyMaxCharacters?: number;
-  } = {}
+  } = {},
 ): Promise<RunVersionResult> {
   const versionBranch = `changeset-release/${ctx.inputs.branch}`;
 
@@ -158,24 +160,24 @@ export async function runVersion(
       {
         cwd: ctx.cwd,
         env,
-      }
+      },
     );
   }
 
   const changedPackages = await getChangedPackages(
     ctx.cwd,
-    versionsByDirectory
+    versionsByDirectory,
   );
   const changedPackagesInfoPromises = Promise.all(
     changedPackages.map(async (pkg) => {
       const changelogContents = await fs.readFile(
         path.join(pkg.dir, "CHANGELOG.md"),
-        "utf8"
+        "utf8",
       );
 
       const entry = getChangelogEntry(
         changelogContents,
-        pkg.packageJson.version
+        pkg.packageJson.version,
       );
       return {
         highestLevel: entry?.highestLevel ?? BumpLevels.dep,
@@ -183,7 +185,7 @@ export async function runVersion(
         content: entry?.content ?? "",
         header: `## ${pkg.packageJson.name}@${pkg.packageJson.version}`,
       };
-    })
+    }),
   );
 
   const finalPrTitle = `${ctx.inputs.title}${

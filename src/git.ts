@@ -11,7 +11,7 @@ async function push(branch: string, cwd: string): Promise<void> {
 
 async function switchToMaybeExistingBranch(
   branch: string,
-  cwd: string
+  cwd: string,
 ): Promise<void> {
   const { stderr } = await getExecOutput("git", ["checkout", branch], {
     ignoreReturnCode: true,

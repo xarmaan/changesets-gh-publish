@@ -54,7 +54,7 @@ export class ActionContext {
 }
 
 function getInputs(
-  input: (name: string) => string = (name) => core.getInput(name)
+  input: (name: string) => string = (name) => core.getInput(name),
 ): Inputs {
   // to maintain compatibility with workflows created before github_token input was introduced
   // it's important to prefer the explicitly set GITHUB_TOKEN over the default token coming from github.token
@@ -94,7 +94,7 @@ function getInputs(
     }
     if (publish !== "github") {
       throw new Error(
-        `External repository can only be specified when "publish" is set to "github"`
+        `External repository can only be specified when "publish" is set to "github"`,
       );
     }
   }
@@ -103,12 +103,12 @@ function getInputs(
   let externalUserEmail = optional(input("user_email"));
   if (externalUserName && !externalUserEmail) {
     throw new Error(
-      '"external_user_email" must be provided together with "external_user_name"'
+      '"external_user_email" must be provided together with "external_user_name"',
     );
   }
   if (!externalUserName && externalUserEmail) {
     throw new Error(
-      '"external_user_name" must be provided together with "external_user_email"'
+      '"external_user_name" must be provided together with "external_user_email"',
     );
   }
   externalUserName ||= userName;

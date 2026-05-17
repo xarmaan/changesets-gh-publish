@@ -20,7 +20,7 @@ async function createRelease(
     tagName,
     owner,
     repo,
-  }: { pkg: Package; tagName: string; owner: string; repo: string }
+  }: { pkg: Package; tagName: string; owner: string; repo: string },
 ): Promise<void> {
   let changelog: string;
   try {
@@ -38,7 +38,7 @@ async function createRelease(
     // we can find a changelog but not the entry for this version
     // if this is true, something has probably gone wrong
     throw new Error(
-      `Could not find changelog entry for ${pkg.packageJson.name}@${pkg.packageJson.version}`
+      `Could not find changelog entry for ${pkg.packageJson.name}@${pkg.packageJson.version}`,
     );
   }
 
@@ -65,7 +65,7 @@ type PublishResult =
 
 export async function runScriptPublish(
   script: string,
-  ctx: ActionContext
+  ctx: ActionContext,
 ): Promise<PublishResult> {
   const [publishCommand, ...publishArgs] = script.split(/\s+/);
 
@@ -75,7 +75,7 @@ export async function runScriptPublish(
     {
       cwd: ctx.cwd,
       env: { ...process.env, GITHUB_TOKEN: ctx.inputs.githubToken },
-    }
+    },
   );
 
   const { packages, tool } = await getPackages(ctx.cwd);
@@ -84,7 +84,7 @@ export async function runScriptPublish(
   if (tool !== "root") {
     const newTagRegex = /New tag:\s+(@[^/]+\/[^@]+|[^/]+)@([^\s]+)/;
     const packagesByName = new Map(
-      packages.map((x) => [x.packageJson.name, x])
+      packages.map((x) => [x.packageJson.name, x]),
     );
 
     for (const line of changesetPublishOutput.stdout.split("\n")) {
@@ -97,7 +97,7 @@ export async function runScriptPublish(
       if (pkg === undefined) {
         throw new Error(
           `Package "${pkgName}" not found.` +
-            "This is probably a bug in the action, please open an issue"
+            "This is probably a bug in the action, please open an issue",
         );
       }
       releasedPackages.push(pkg);
@@ -113,14 +113,14 @@ export async function runScriptPublish(
             pkg,
             tagName,
           });
-        })
+        }),
       );
     }
   } else {
     if (packages.length === 0) {
       throw new Error(
         `No package found.` +
-          "This is probably a bug in the action, please open an issue"
+          "This is probably a bug in the action, please open an issue",
       );
     }
     const pkg = packages[0];
@@ -159,7 +159,7 @@ export async function runScriptPublish(
 }
 
 export async function runGitHubPublish(
-  ctx: ActionContext
+  ctx: ActionContext,
 ): Promise<PublishResult> {
   let pm: DetectResult | null = null;
 
@@ -177,7 +177,7 @@ export async function runGitHubPublish(
 
   const workDir = path.resolve(
     ctx.home,
-    `changesets-gh-publish-action-${Date.now()}`
+    `changesets-gh-publish-action-${Date.now()}`,
   );
   const gitDir = path.resolve(workDir, "git");
   const packsDir = path.resolve(workDir, "packs");
@@ -216,7 +216,7 @@ export async function runGitHubPublish(
       if (tool === "root") {
         throw new Error(
           `No package found.` +
-            "This is probably a bug in the action, please open an issue"
+            "This is probably a bug in the action, please open an issue",
         );
       } else {
         return { published: false };
@@ -235,14 +235,14 @@ export async function runGitHubPublish(
           {
             cwd: gitDir,
             ignoreReturnCode: true,
-          }
+          },
         );
         if (checkTagCode !== 0) {
           throw new Error(
-            `Invalid Git tag name "${tag}" generated from package "${pkg.packageJson.name}".`
+            `Invalid Git tag name "${tag}" generated from package "${pkg.packageJson.name}".`,
           );
         }
-      })
+      }),
     );
 
     const repoFound =
@@ -260,7 +260,7 @@ export async function runGitHubPublish(
         }));
     if (!repoFound) {
       throw new Error(
-        `Repository ${repository} does not exist or is inaccessible.`
+        `Repository ${repository} does not exist or is inaccessible.`,
       );
     }
     core.info(`[INFO] repository accessible: ${repository}`);
@@ -279,8 +279,8 @@ export async function runGitHubPublish(
             tag,
             published: remoteTags.has(tag),
           };
-        }
-      )
+        },
+      ),
     );
 
     const packagesToPublish = packagesInfo.filter((pkg) => !pkg.published);
@@ -311,7 +311,7 @@ export async function runGitHubPublish(
             const dest = path.join(gitDir, file);
             await io.mkdirP(path.dirname(dest));
             await fs.copyFile(src, dest);
-          })
+          }),
         );
       }
 
@@ -331,7 +331,7 @@ export async function runGitHubPublish(
     await exec(
       "git",
       ["push", "origin", ...packagesToPublish.map((pkg) => pkg.tag)],
-      { cwd: gitDir }
+      { cwd: gitDir },
     );
 
     if (ctx.inputs.createGithubReleases) {
@@ -343,7 +343,7 @@ export async function runGitHubPublish(
             pkg,
             tagName: pkg.tag,
           });
-        })
+        }),
       );
     }
 
@@ -363,7 +363,7 @@ export async function runGitHubPublish(
 
 function getGitHubRemoteUrl(githubToken: string, repository: string): string {
   const serverUrl = new URL(
-    process.env["GITHUB_SERVER_URL"] || "https://github.com"
+    process.env["GITHUB_SERVER_URL"] || "https://github.com",
   );
   return `https://x-access-token:${githubToken}@${serverUrl.host}/${repository}.git`;
 }
@@ -371,14 +371,14 @@ function getGitHubRemoteUrl(githubToken: string, repository: string): string {
 async function packPackage(
   pm: "npm" | "pnpm",
   pkgDir: string,
-  destDir: string
+  destDir: string,
 ): Promise<string> {
   const { stdout } = await getExecOutput(
     pm,
     ["pack", "--json", "--pack-destination", destDir],
     {
       cwd: pkgDir,
-    }
+    },
   );
 
   const output = JSON.parse(stdout) as

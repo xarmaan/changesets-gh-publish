@@ -14,7 +14,7 @@ import { runVersion } from "./version.ts";
 
   if (ctx.inputs.setupGitUser) {
     core.info(
-      `[INFO] setting git user: ${ctx.inputs.userName} <${ctx.inputs.userEmail}>`
+      `[INFO] setting git user: ${ctx.inputs.userName} <${ctx.inputs.userEmail}>`,
     );
     await ctx.git.setupUser(ctx.inputs.userName, ctx.inputs.userEmail);
   }
@@ -22,7 +22,7 @@ import { runVersion } from "./version.ts";
   core.info("[INFO] setting GitHub credentials");
   await fs.writeFile(
     path.resolve(ctx.home, ".netrc"),
-    `machine github.com\nlogin ${ctx.inputs.userEmail}\npassword ${ctx.inputs.githubToken}`
+    `machine github.com\nlogin ${ctx.inputs.userEmail}\npassword ${ctx.inputs.githubToken}`,
   );
 
   const { changesets } = await readChangesetState(ctx.cwd);
@@ -30,7 +30,7 @@ import { runVersion } from "./version.ts";
   const publishScript = ctx.inputs.publish ?? "";
   const hasChangesets = changesets.length !== 0;
   const hasNonEmptyChangesets = changesets.some(
-    (changeset) => changeset.releases.length > 0
+    (changeset) => changeset.releases.length > 0,
   );
   const hasPublishScript = !!publishScript && publishScript !== "github";
 
@@ -41,7 +41,7 @@ import { runVersion } from "./version.ts";
   switch (true) {
     case !hasChangesets && publishScript === "github": {
       core.info(
-        "[INFO] No changesets found. Attempting to publish any unpublished packages to GitHub"
+        "[INFO] No changesets found. Attempting to publish any unpublished packages to GitHub",
       );
 
       await runGitHubPublish(ctx);
@@ -50,13 +50,13 @@ import { runVersion } from "./version.ts";
     }
     case !hasChangesets && !hasPublishScript: {
       core.info(
-        "[INFO] No changesets present or were removed by merging release PR. Not publishing because no publish script found."
+        "[INFO] No changesets present or were removed by merging release PR. Not publishing because no publish script found.",
       );
       return;
     }
     case !hasChangesets && hasPublishScript: {
       core.info(
-        "[INFO] No changesets found. Attempting to publish any unpublished packages to npm"
+        "[INFO] No changesets found. Attempting to publish any unpublished packages to npm",
       );
 
       if (process.env.NPM_TOKEN) {
@@ -71,24 +71,24 @@ import { runVersion } from "./version.ts";
           });
           if (authLine) {
             core.info(
-              "[INFO] Found existing auth token for the npm registry in the user .npmrc file"
+              "[INFO] Found existing auth token for the npm registry in the user .npmrc file",
             );
           } else {
             core.info(
-              "[INFO] Didn't find existing auth token for the npm registry in the user .npmrc file, creating one"
+              "[INFO] Didn't find existing auth token for the npm registry in the user .npmrc file, creating one",
             );
             await fs.appendFile(
               userNpmrcPath,
-              `\n//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}\n`
+              `\n//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}\n`,
             );
           }
         } else {
           core.info(
-            "[INFO] No user .npmrc file found, creating one with NPM_TOKEN used as auth token"
+            "[INFO] No user .npmrc file found, creating one with NPM_TOKEN used as auth token",
           );
           await fs.writeFile(
             userNpmrcPath,
-            `//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}\n`
+            `//registry.npmjs.org/:_authToken=${process.env.NPM_TOKEN}\n`,
           );
         }
       } else if (
@@ -96,11 +96,11 @@ import { runVersion } from "./version.ts";
         process.env.ACTIONS_ID_TOKEN_REQUEST_URL
       ) {
         core.info(
-          "[INFO] No NPM_TOKEN found, but OIDC is available - using npm trusted publishing"
+          "[INFO] No NPM_TOKEN found, but OIDC is available - using npm trusted publishing",
         );
       } else {
         core.info(
-          "[INFO] No NPM_TOKEN or OIDC available - assuming npm is already authenticated"
+          "[INFO] No NPM_TOKEN or OIDC available - assuming npm is already authenticated",
         );
       }
 
@@ -110,7 +110,7 @@ import { runVersion } from "./version.ts";
         core.setOutput("published", "true");
         core.setOutput(
           "published_packages",
-          JSON.stringify(result.publishedPackages)
+          JSON.stringify(result.publishedPackages),
         );
       }
 

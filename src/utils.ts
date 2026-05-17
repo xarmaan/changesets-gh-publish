@@ -15,7 +15,7 @@ export const BumpLevels = {
 } as const;
 
 export async function getVersionsByDirectory(
-  cwd: string
+  cwd: string,
 ): Promise<Map<string, string>> {
   const { packages } = await getPackages(cwd);
   return new Map(packages.map((x) => [x.dir, x.packageJson.version]));
@@ -23,7 +23,7 @@ export async function getVersionsByDirectory(
 
 export async function getChangedPackages(
   cwd: string,
-  previousVersions: Map<string, string>
+  previousVersions: Map<string, string>,
 ): Promise<Package[]> {
   const { packages } = await getPackages(cwd);
   const changedPackages = new Set<Package>();
@@ -45,7 +45,7 @@ type ChangelogEntry = {
 
 export function getChangelogEntry(
   changelog: string,
-  version: string
+  version: string,
 ): ChangelogEntry | undefined {
   const ast = unified().use(remarkParse).parse(changelog) as Root;
 
@@ -98,7 +98,7 @@ export function getChangelogEntry(
 
 export function sortTheThings(
   a: { private: boolean; highestLevel: number },
-  b: { private: boolean; highestLevel: number }
+  b: { private: boolean; highestLevel: number },
 ): number {
   if (a.private === b.private) {
     return b.highestLevel - a.highestLevel;
@@ -121,6 +121,6 @@ export function isErrorWithCode(err: unknown, code: string): boolean {
 export function fileExists(filePath: string): Promise<boolean> {
   return fs.access(filePath, fs.constants.F_OK).then(
     () => true,
-    () => false
+    () => false,
   );
 }
