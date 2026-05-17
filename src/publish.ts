@@ -295,6 +295,9 @@ export async function runGitHubPublish(
     });
     await exec("git", ["clean", "-fdx"], { cwd: gitDir });
 
+    core.startGroup(
+      `Packing ${pkg.packageJson.name}@${pkg.packageJson.version}`,
+    );
     if (pm?.agent === "pnpm" || pm?.agent === "npm") {
       const tarball = await packPackage(pm.agent, pkg.dir, packsDir);
       try {
@@ -308,7 +311,17 @@ export async function runGitHubPublish(
       }
     } else {
       const files = await packlist(pkg.dir);
-
+      console.log(
+        JSON.stringify(
+          {
+            name: pkg.packageJson.name,
+            version: pkg.packageJson.version,
+            files: files.map((path) => ({ path })),
+          },
+          null,
+          2,
+        ),
+      );
       await Promise.all(
         files.map(async (file) => {
           const src = path.join(pkg.dir, file);
@@ -318,6 +331,7 @@ export async function runGitHubPublish(
         }),
       );
     }
+    core.endGroup();
 
     await exec("git", ["add", "."], {
       cwd: gitDir,
