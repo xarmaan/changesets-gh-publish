@@ -1,11 +1,11 @@
-import unified from "unified";
-import remarkParse from "remark-parse";
-import remarkStringify from "remark-stringify";
 import fs from "node:fs/promises";
+import { getPackages, type Package } from "@manypkg/get-packages";
 import type { Root } from "mdast";
 // @ts-ignore
 import mdastToString from "mdast-util-to-string";
-import { getPackages, type Package } from "@manypkg/get-packages";
+import remarkParse from "remark-parse";
+import remarkStringify from "remark-stringify";
+import unified from "unified";
 
 export const BumpLevels = {
   dep: 0,
@@ -14,19 +14,21 @@ export const BumpLevels = {
   major: 3,
 } as const;
 
-export async function getVersionsByDirectory(cwd: string) {
-  let { packages } = await getPackages(cwd);
+export async function getVersionsByDirectory(
+  cwd: string
+): Promise<Map<string, string>> {
+  const { packages } = await getPackages(cwd);
   return new Map(packages.map((x) => [x.dir, x.packageJson.version]));
 }
 
 export async function getChangedPackages(
   cwd: string,
   previousVersions: Map<string, string>
-) {
-  let { packages } = await getPackages(cwd);
-  let changedPackages = new Set<Package>();
+): Promise<Package[]> {
+  const { packages } = await getPackages(cwd);
+  const changedPackages = new Set<Package>();
 
-  for (let pkg of packages) {
+  for (const pkg of packages) {
     const previousVersion = previousVersions.get(pkg.dir);
     if (previousVersion !== pkg.packageJson.version) {
       changedPackages.add(pkg);
@@ -36,27 +38,30 @@ export async function getChangedPackages(
   return [...changedPackages];
 }
 
-export function getChangelogEntry(changelog: string, version: string) {
-  let ast = unified().use(remarkParse).parse(changelog) as Root;
+type ChangelogEntry = {
+  content: string;
+  highestLevel: number;
+};
+
+export function getChangelogEntry(
+  changelog: string,
+  version: string
+): ChangelogEntry | undefined {
+  const ast = unified().use(remarkParse).parse(changelog) as Root;
 
   let highestLevel: number = BumpLevels.dep;
 
-  let nodes = ast.children;
-  let headingStartInfo:
-    | {
-        index: number;
-        depth: number;
-      }
-    | undefined;
+  const nodes = ast.children;
+  let headingStartInfo: { index: number; depth: number } | undefined;
   let endIndex: number | undefined;
 
   for (let i = 0; i < nodes.length; i++) {
-    let node = nodes[i];
+    const node = nodes[i];
     if (node.type === "heading") {
-      let stringified: string = mdastToString(node);
-      let match = stringified.toLowerCase().match(/(major|minor|patch)/);
+      const stringified: string = mdastToString(node);
+      const match = stringified.toLowerCase().match(/(major|minor|patch)/);
       if (match !== null) {
-        let level = BumpLevels[match[0] as "major" | "minor" | "patch"];
+        const level = BumpLevels[match[0] as "major" | "minor" | "patch"];
         highestLevel = Math.max(level, highestLevel);
       }
       if (headingStartInfo === undefined && stringified === version) {
@@ -76,19 +81,25 @@ export function getChangelogEntry(changelog: string, version: string) {
       }
     }
   }
-  if (headingStartInfo) {
-    ast.children = ast.children.slice(headingStartInfo.index + 1, endIndex);
+
+  if (!headingStartInfo) {
+    return;
   }
+
+  const tree: Root = {
+    type: "root",
+    children: ast.children.slice(headingStartInfo.index + 1, endIndex),
+  };
   return {
-    content: unified().use(remarkStringify).stringify(ast),
-    highestLevel: highestLevel,
+    content: unified().use(remarkStringify).stringify(tree),
+    highestLevel,
   };
 }
 
 export function sortTheThings(
   a: { private: boolean; highestLevel: number },
   b: { private: boolean; highestLevel: number }
-) {
+): number {
   if (a.private === b.private) {
     return b.highestLevel - a.highestLevel;
   }
@@ -98,7 +109,7 @@ export function sortTheThings(
   return -1;
 }
 
-export function isErrorWithCode(err: unknown, code: string) {
+export function isErrorWithCode(err: unknown, code: string): boolean {
   return (
     typeof err === "object" &&
     err !== null &&
@@ -107,7 +118,7 @@ export function isErrorWithCode(err: unknown, code: string) {
   );
 }
 
-export function fileExists(filePath: string) {
+export function fileExists(filePath: string): Promise<boolean> {
   return fs.access(filePath, fs.constants.F_OK).then(
     () => true,
     () => false

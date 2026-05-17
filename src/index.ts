@@ -1,85 +1,69 @@
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import * as core from "@actions/core";
-import fs from "node:fs/promises";
-import path from "node:path";
-import { Git } from "./git.ts";
-import { setupOctokit } from "./octokit.ts";
-import readChangesetState from "./readChangesetState.ts";
-import { runPublish, runVersion } from "./run.ts";
+import { readChangesetState } from "./changeset.ts";
+import { ActionContext } from "./context.ts";
+import { runGitHubPublish, runScriptPublish } from "./publish.ts";
 import { fileExists } from "./utils.ts";
-
-const getOptionalInput = (name: string) => core.getInput(name) || undefined;
+import { runVersion } from "./version.ts";
 
 (async () => {
-  // to maintain compatibility with workflows created before github-token input was introduced
-  // it's important to prefer the explicitly set GITHUB_TOKEN over the default token coming from github.token
-  let githubToken = process.env.GITHUB_TOKEN || core.getInput("github-token");
+  const ctx = new ActionContext();
 
-  if (!githubToken) {
-    core.setFailed("Please add the GITHUB_TOKEN to the changesets action");
-    return;
+  core.info(`[INFO] using resolved cwd: ${ctx.cwd}`);
+
+  if (ctx.inputs.setupGitUser) {
+    core.info(
+      `[INFO] setting git user: ${ctx.inputs.userName} <${ctx.inputs.userEmail}>`
+    );
+    await ctx.git.setupUser(ctx.inputs.userName, ctx.inputs.userEmail);
   }
 
-  const cwd = path.resolve(getOptionalInput("cwd") ?? "");
-  core.info(`using resolved cwd: ${cwd}`);
-
-  const octokit = setupOctokit(githubToken);
-  const commitMode = getOptionalInput("commitMode") ?? "git-cli";
-  const prDraft = getOptionalInput("prDraft");
-  if (commitMode !== "git-cli" && commitMode !== "github-api") {
-    core.setFailed(`Invalid commit mode: ${commitMode}`);
-    return;
-  }
-  if (prDraft !== undefined && prDraft !== "always" && prDraft !== "create") {
-    core.setFailed(`Invalid prDraft: ${prDraft}`);
-    return;
-  }
-  const git = new Git({
-    octokit: commitMode === "github-api" ? octokit : undefined,
-    cwd,
-  });
-
-  let setupGitUser = core.getBooleanInput("setupGitUser");
-
-  if (setupGitUser) {
-    core.info("setting git user");
-    await git.setupUser();
-  }
-
-  core.info("setting GitHub credentials");
+  core.info("[INFO] setting GitHub credentials");
   await fs.writeFile(
-    `${process.env.HOME}/.netrc`,
-    `machine github.com\nlogin github-actions[bot]\npassword ${githubToken}`
+    path.resolve(ctx.home, ".netrc"),
+    `machine github.com\nlogin ${ctx.inputs.userEmail}\npassword ${ctx.inputs.githubToken}`
   );
 
-  let { changesets } = await readChangesetState(cwd);
+  const { changesets } = await readChangesetState(ctx.cwd);
 
-  let publishScript = core.getInput("publish");
-  let hasChangesets = changesets.length !== 0;
+  const publishScript = ctx.inputs.publish ?? "";
+  const hasChangesets = changesets.length !== 0;
   const hasNonEmptyChangesets = changesets.some(
     (changeset) => changeset.releases.length > 0
   );
-  let hasPublishScript = !!publishScript;
+  const hasPublishScript = !!publishScript && publishScript !== "github";
 
   core.setOutput("published", "false");
-  core.setOutput("publishedPackages", "[]");
-  core.setOutput("hasChangesets", String(hasChangesets));
+  core.setOutput("published_packages", "[]");
+  core.setOutput("has_changesets", String(hasChangesets));
 
   switch (true) {
-    case !hasChangesets && !hasPublishScript:
+    case !hasChangesets && publishScript === "github": {
       core.info(
-        "No changesets present or were removed by merging release PR. Not publishing because no publish script found."
+        "[INFO] No changesets found. Attempting to publish any unpublished packages to GitHub"
+      );
+
+      await runGitHubPublish(ctx);
+
+      return;
+    }
+    case !hasChangesets && !hasPublishScript: {
+      core.info(
+        "[INFO] No changesets present or were removed by merging release PR. Not publishing because no publish script found."
       );
       return;
+    }
     case !hasChangesets && hasPublishScript: {
       core.info(
-        "No changesets found. Attempting to publish any unpublished packages to npm"
+        "[INFO] No changesets found. Attempting to publish any unpublished packages to npm"
       );
 
       if (process.env.NPM_TOKEN) {
-        const userNpmrcPath = `${process.env.HOME}/.npmrc`;
+        const userNpmrcPath = path.resolve(ctx.home, ".npmrc");
 
         if (await fileExists(userNpmrcPath)) {
-          core.info("Found existing user .npmrc file");
+          core.info("[INFO] Found existing user .npmrc file");
           const userNpmrcContent = await fs.readFile(userNpmrcPath, "utf8");
           const authLine = userNpmrcContent.split("\n").find((line) => {
             // check based on https://github.com/npm/cli/blob/8f8f71e4dd5ee66b3b17888faad5a7bf6c657eed/test/lib/adduser.js#L103-L105
@@ -87,11 +71,11 @@ const getOptionalInput = (name: string) => core.getInput(name) || undefined;
           });
           if (authLine) {
             core.info(
-              "Found existing auth token for the npm registry in the user .npmrc file"
+              "[INFO] Found existing auth token for the npm registry in the user .npmrc file"
             );
           } else {
             core.info(
-              "Didn't find existing auth token for the npm registry in the user .npmrc file, creating one"
+              "[INFO] Didn't find existing auth token for the npm registry in the user .npmrc file, creating one"
             );
             await fs.appendFile(
               userNpmrcPath,
@@ -100,7 +84,7 @@ const getOptionalInput = (name: string) => core.getInput(name) || undefined;
           }
         } else {
           core.info(
-            "No user .npmrc file found, creating one with NPM_TOKEN used as auth token"
+            "[INFO] No user .npmrc file found, creating one with NPM_TOKEN used as auth token"
           );
           await fs.writeFile(
             userNpmrcPath,
@@ -112,51 +96,38 @@ const getOptionalInput = (name: string) => core.getInput(name) || undefined;
         process.env.ACTIONS_ID_TOKEN_REQUEST_URL
       ) {
         core.info(
-          "No NPM_TOKEN found, but OIDC is available - using npm trusted publishing"
+          "[INFO] No NPM_TOKEN found, but OIDC is available - using npm trusted publishing"
         );
       } else {
         core.info(
-          "No NPM_TOKEN or OIDC available - assuming npm is already authenticated"
+          "[INFO] No NPM_TOKEN or OIDC available - assuming npm is already authenticated"
         );
       }
 
-      const result = await runPublish({
-        script: publishScript,
-        githubToken,
-        git,
-        octokit,
-        createGithubReleases: core.getBooleanInput("createGithubReleases"),
-        cwd,
-      });
+      const result = await runScriptPublish(publishScript, ctx);
 
       if (result.published) {
         core.setOutput("published", "true");
         core.setOutput(
-          "publishedPackages",
+          "published_packages",
           JSON.stringify(result.publishedPackages)
         );
       }
+
       return;
     }
-    case hasChangesets && !hasNonEmptyChangesets:
-      core.info("All changesets are empty; not creating PR");
+    case hasChangesets && !hasNonEmptyChangesets: {
+      core.info("[INFO] All changesets are empty; not creating PR");
+
       return;
+    }
     case hasChangesets: {
-      const octokit = setupOctokit(githubToken);
-      const { pullRequestNumber } = await runVersion({
-        script: getOptionalInput("version"),
-        githubToken,
-        git,
-        octokit,
-        cwd,
-        prTitle: getOptionalInput("title"),
-        commitMessage: getOptionalInput("commit"),
+      const { pullRequestNumber } = await runVersion(ctx, {
+        script: ctx.inputs.version,
         hasPublishScript,
-        prDraft,
-        branch: getOptionalInput("branch"),
       });
 
-      core.setOutput("pullRequestNumber", String(pullRequestNumber));
+      core.setOutput("pull_request_number", String(pullRequestNumber));
 
       return;
     }

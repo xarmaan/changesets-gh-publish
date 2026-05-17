@@ -2,18 +2,18 @@ import * as core from "@actions/core";
 import { getOctokit } from "@actions/github";
 import { throttling } from "@octokit/plugin-throttling";
 
-export const setupOctokit = (githubToken: string) => {
+export function setupOctokit(githubToken: string) {
   return getOctokit(
     githubToken,
     {
       throttle: {
         onRateLimit: (retryAfter, options: any, octokit, retryCount) => {
           core.warning(
-            `Request quota exhausted for request ${options.method} ${options.url}`
+            `[WARN] Request quota exhausted for request ${options.method} ${options.url}`
           );
 
           if (retryCount <= 2) {
-            core.info(`Retrying after ${retryAfter} seconds!`);
+            core.info(`[INFO] Retrying after ${retryAfter} seconds!`);
             return true;
           }
         },
@@ -24,11 +24,11 @@ export const setupOctokit = (githubToken: string) => {
           retryCount
         ) => {
           core.warning(
-            `SecondaryRateLimit detected for request ${options.method} ${options.url}`
+            `[WARN] SecondaryRateLimit detected for request ${options.method} ${options.url}`
           );
 
           if (retryCount <= 2) {
-            core.info(`Retrying after ${retryAfter} seconds!`);
+            core.info(`[INFO] Retrying after ${retryAfter} seconds!`);
             return true;
           }
         },
@@ -36,6 +36,6 @@ export const setupOctokit = (githubToken: string) => {
     },
     throttling
   );
-};
+}
 
 export type Octokit = ReturnType<typeof setupOctokit>;

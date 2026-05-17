@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { BumpLevels, getChangelogEntry, sortTheThings } from "./utils.ts";
 
-let changelog = `# @keystone-alpha/email
+const changelog = `# @keystone-alpha/email
 
 ## 3.0.1
 
@@ -69,19 +69,19 @@ let changelog = `# @keystone-alpha/email
 `;
 
 test("it works", () => {
-  let entry = getChangelogEntry(changelog, "3.0.0");
-  expect(entry.content).toMatchSnapshot();
-  expect(entry.highestLevel).toBe(BumpLevels.major);
+  const entry = getChangelogEntry(changelog, "3.0.0");
+  expect(entry?.content).toMatchSnapshot();
+  expect(entry?.highestLevel).toBe(BumpLevels.major);
 });
 
 test("it works", () => {
-  let entry = getChangelogEntry(changelog, "3.0.1");
-  expect(entry.content).toMatchSnapshot();
-  expect(entry.highestLevel).toBe(BumpLevels.patch);
+  const entry = getChangelogEntry(changelog, "3.0.1");
+  expect(entry?.content).toMatchSnapshot();
+  expect(entry?.highestLevel).toBe(BumpLevels.patch);
 });
 
 test("it sorts the things right", () => {
-  let things = [
+  const things = [
     {
       name: "a",
       highestLevel: BumpLevels.major,

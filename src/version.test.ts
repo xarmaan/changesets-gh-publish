@@ -1,12 +1,11 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import type { Changeset } from "@changesets/types";
 import writeChangeset from "@changesets/write";
 import fixturez from "fixturez";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Git } from "./git.ts";
-import { setupOctokit } from "./octokit.ts";
-import { runVersion } from "./run.ts";
+import { ActionContext } from "./context.ts";
+import { runVersion } from "./version.ts";
 
 vi.mock("@actions/github", () => ({
   context: {
@@ -25,7 +24,7 @@ vi.mock("@actions/github", () => ({
 vi.mock("./git.ts");
 vi.mock("@changesets/ghcommit/git");
 
-let mockedGithubMethods = {
+const mockedGithubMethods = {
   pulls: {
     create: vi.fn(),
     list: vi.fn(),
@@ -34,9 +33,9 @@ let mockedGithubMethods = {
     createRelease: vi.fn(),
   },
 };
-let mockedGraphql = vi.fn();
+const mockedGraphql = vi.fn();
 
-let f = fixturez(import.meta.dirname);
+const f = fixturez(import.meta.dirname);
 
 const linkNodeModules = async (cwd: string) => {
   await fs.symlink(
@@ -54,7 +53,7 @@ beforeEach(() => {
 
 describe("version", () => {
   it("creates simple PR", async () => {
-    let cwd = f.copy("simple-project");
+    const cwd = f.copy("simple-project");
     await linkNodeModules(cwd);
 
     mockedGithubMethods.pulls.list.mockImplementationOnce(() => ({ data: [] }));
@@ -82,18 +81,25 @@ describe("version", () => {
       cwd
     );
 
-    await runVersion({
-      octokit: setupOctokit("@@GITHUB_TOKEN"),
-      githubToken: "@@GITHUB_TOKEN",
-      git: new Git({ cwd }),
+    const ctx = new ActionContext({
       cwd,
+      getInput: (name) => {
+        switch (name) {
+          case "github_token":
+            return "@@GITHUB";
+          default:
+            return "";
+        }
+      },
     });
+
+    await runVersion(ctx);
 
     expect(mockedGithubMethods.pulls.create.mock.calls[0]).toMatchSnapshot();
   });
 
-  it('creates a draft PR when prDraft is "create"', async () => {
-    let cwd = f.copy("simple-project");
+  it('creates a draft PR when pr_draft is "create"', async () => {
+    const cwd = f.copy("simple-project");
     await linkNodeModules(cwd);
 
     mockedGithubMethods.pulls.list.mockImplementationOnce(() => ({ data: [] }));
@@ -117,19 +123,27 @@ describe("version", () => {
       cwd
     );
 
-    await runVersion({
-      octokit: setupOctokit("@@GITHUB_TOKEN"),
-      githubToken: "@@GITHUB_TOKEN",
-      git: new Git({ cwd }),
+    const ctx = new ActionContext({
       cwd,
-      prDraft: "create",
+      getInput: (name) => {
+        switch (name) {
+          case "github_token":
+            return "@@GITHUB";
+          case "pr_draft":
+            return "create";
+          default:
+            return "";
+        }
+      },
     });
+
+    await runVersion(ctx);
 
     expect(mockedGithubMethods.pulls.create.mock.calls[0]).toMatchSnapshot();
   });
 
   it("only includes bumped packages in the PR body", async () => {
-    let cwd = f.copy("simple-project");
+    const cwd = f.copy("simple-project");
     await linkNodeModules(cwd);
 
     mockedGithubMethods.pulls.list.mockImplementationOnce(() => ({ data: [] }));
@@ -153,18 +167,25 @@ describe("version", () => {
       cwd
     );
 
-    await runVersion({
-      octokit: setupOctokit("@@GITHUB_TOKEN"),
-      githubToken: "@@GITHUB_TOKEN",
-      git: new Git({ cwd }),
+    const ctx = new ActionContext({
       cwd,
+      getInput: (name) => {
+        switch (name) {
+          case "github_token":
+            return "@@GITHUB";
+          default:
+            return "";
+        }
+      },
     });
+
+    await runVersion(ctx);
 
     expect(mockedGithubMethods.pulls.create.mock.calls[0]).toMatchSnapshot();
   });
 
   it("doesn't include ignored package that got a dependency update in the PR body", async () => {
-    let cwd = f.copy("ignored-package");
+    const cwd = f.copy("ignored-package");
     await linkNodeModules(cwd);
 
     mockedGithubMethods.pulls.list.mockImplementationOnce(() => ({ data: [] }));
@@ -188,18 +209,25 @@ describe("version", () => {
       cwd
     );
 
-    await runVersion({
-      octokit: setupOctokit("@@GITHUB_TOKEN"),
-      githubToken: "@@GITHUB_TOKEN",
-      git: new Git({ cwd }),
+    const ctx = new ActionContext({
       cwd,
+      getInput: (name) => {
+        switch (name) {
+          case "github_token":
+            return "@@GITHUB";
+          default:
+            return "";
+        }
+      },
     });
+
+    await runVersion(ctx);
 
     expect(mockedGithubMethods.pulls.create.mock.calls[0]).toMatchSnapshot();
   });
 
   it("does not include changelog entries if full message exceeds size limit", async () => {
-    let cwd = f.copy("simple-project");
+    const cwd = f.copy("simple-project");
     await linkNodeModules(cwd);
 
     mockedGithubMethods.pulls.list.mockImplementationOnce(() => ({ data: [] }));
@@ -243,13 +271,19 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
       cwd
     );
 
-    await runVersion({
-      octokit: setupOctokit("@@GITHUB_TOKEN"),
-      githubToken: "@@GITHUB_TOKEN",
-      git: new Git({ cwd }),
+    const ctx = new ActionContext({
       cwd,
-      prBodyMaxCharacters: 1000,
+      getInput: (name) => {
+        switch (name) {
+          case "github_token":
+            return "@@GITHUB";
+          default:
+            return "";
+        }
+      },
     });
+
+    await runVersion(ctx, { prBodyMaxCharacters: 1000 });
 
     expect(mockedGithubMethods.pulls.create.mock.calls[0]).toMatchSnapshot();
     expect(mockedGithubMethods.pulls.create.mock.calls[0][0].body).toMatch(
@@ -258,7 +292,7 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
   });
 
   it("does not include any release information if a message with simplified release info exceeds size limit", async () => {
-    let cwd = f.copy("simple-project");
+    const cwd = f.copy("simple-project");
     await linkNodeModules(cwd);
 
     mockedGithubMethods.pulls.list.mockImplementationOnce(() => ({ data: [] }));
@@ -302,13 +336,19 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
       cwd
     );
 
-    await runVersion({
-      octokit: setupOctokit("@@GITHUB_TOKEN"),
-      githubToken: "@@GITHUB_TOKEN",
-      git: new Git({ cwd }),
+    const ctx = new ActionContext({
       cwd,
-      prBodyMaxCharacters: 500,
+      getInput: (name) => {
+        switch (name) {
+          case "github_token":
+            return "@@GITHUB";
+          default:
+            return "";
+        }
+      },
     });
+
+    await runVersion(ctx, { prBodyMaxCharacters: 500 });
 
     expect(mockedGithubMethods.pulls.create.mock.calls[0]).toMatchSnapshot();
     expect(mockedGithubMethods.pulls.create.mock.calls[0][0].body).toMatch(
@@ -316,8 +356,8 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
     );
   });
 
-  it('updates an existing PR via GraphQL without converting it to draft when prDraft is "create"', async () => {
-    let cwd = f.copy("simple-project");
+  it('updates an existing PR via GraphQL without converting it to draft when pr_draft is "create"', async () => {
+    const cwd = f.copy("simple-project");
     await linkNodeModules(cwd);
 
     mockedGithubMethods.pulls.list.mockImplementationOnce(() => ({
@@ -339,19 +379,27 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
       cwd
     );
 
-    await runVersion({
-      octokit: setupOctokit("@@GITHUB_TOKEN"),
-      githubToken: "@@GITHUB_TOKEN",
-      git: new Git({ cwd }),
+    const ctx = new ActionContext({
       cwd,
-      prDraft: "create",
+      getInput: (name) => {
+        switch (name) {
+          case "github_token":
+            return "@@GITHUB";
+          case "pr_draft":
+            return "create";
+          default:
+            return "";
+        }
+      },
     });
+
+    await runVersion(ctx);
 
     expect(mockedGraphql.mock.calls[0]).toMatchSnapshot();
   });
 
-  it('updates an existing PR via GraphQL and converts it to draft when prDraft is "always"', async () => {
-    let cwd = f.copy("simple-project");
+  it('updates an existing PR via GraphQL and converts it to draft when pr_draft is "always"', async () => {
+    const cwd = f.copy("simple-project");
     await linkNodeModules(cwd);
 
     mockedGithubMethods.pulls.list.mockImplementationOnce(() => ({
@@ -373,13 +421,21 @@ fluminis divesque vulnere aquis parce lapsis rabie si visa fulmineis.
       cwd
     );
 
-    await runVersion({
-      octokit: setupOctokit("@@GITHUB_TOKEN"),
-      githubToken: "@@GITHUB_TOKEN",
-      git: new Git({ cwd }),
+    const ctx = new ActionContext({
       cwd,
-      prDraft: "always",
+      getInput: (name) => {
+        switch (name) {
+          case "github_token":
+            return "@@GITHUB";
+          case "pr_draft":
+            return "always";
+          default:
+            return "";
+        }
+      },
     });
+
+    await runVersion(ctx);
 
     expect(mockedGraphql.mock.calls[0]).toMatchSnapshot();
   });

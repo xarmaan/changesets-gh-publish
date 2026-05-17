@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`version > creates a draft PR when prDraft is "create" 1`] = `
+exports[`version > creates a draft PR when pr_draft is "create" 1`] = `
 [
   {
     "base": "some-branch",
@@ -145,7 +145,7 @@ exports[`version > only includes bumped packages in the PR body 1`] = `
 ]
 `;
 
-exports[`version > updates an existing PR via GraphQL and converts it to draft when prDraft is "always" 1`] = `
+exports[`version > updates an existing PR via GraphQL and converts it to draft when pr_draft is "always" 1`] = `
 [
   "
       mutation UpdatePullRequest(
@@ -195,7 +195,7 @@ exports[`version > updates an existing PR via GraphQL and converts it to draft w
 ]
 `;
 
-exports[`version > updates an existing PR via GraphQL without converting it to draft when prDraft is "create" 1`] = `
+exports[`version > updates an existing PR via GraphQL without converting it to draft when pr_draft is "create" 1`] = `
 [
   "
       mutation UpdatePullRequest(
