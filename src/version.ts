@@ -9,7 +9,7 @@ import { BumpLevels, getChangelogEntry } from "./changelog.ts";
 import {
   readChangesetState,
   requireChangesetsCliPkgJson,
-} from "./changesets.ts";
+} from "./changeset.ts";
 import { MAX_CHARACTERS_PER_MESSAGE } from "./constants.ts";
 import type { ActionContext } from "./context.ts";
 import {
@@ -116,8 +116,7 @@ export async function runVersion(
   const env = { ...process.env, GITHUB_TOKEN: ctx.inputs.githubToken };
 
   if (script) {
-    const [versionCommand, ...versionArgs] = script.split(/\s+/);
-    await exec(versionCommand, versionArgs, { cwd: ctx.cwd, env });
+    await exec(script, undefined, { cwd: ctx.cwd, env });
   } else {
     const changesetsCliPkgJson = requireChangesetsCliPkgJson(ctx.cwd);
     const cmd = semverLt(changesetsCliPkgJson.version, "2.0.0")

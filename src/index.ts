@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as core from "@actions/core";
-import { readChangesetState } from "./changesets.ts";
+import { readChangesetState } from "./changeset.ts";
 import { ActionContext } from "./context.ts";
 import { runGitHubPublish, runScriptPublish } from "./publish.ts";
 import { fileExists } from "./utils.ts";
@@ -114,6 +114,18 @@ import { runVersion } from "./version.ts";
         );
       }
 
+      if (result.exitCode !== 0) {
+        core.error(
+          `Publish command exited with code ${result.exitCode}${
+            result.published
+              ? `, but some packages were published: ${result.publishedPackages
+                  .map((p) => `${p.name}@${p.version}`)
+                  .join(", ")}`
+              : ""
+          }`,
+        );
+        process.exit(result.exitCode);
+      }
       return;
     }
     case hasChangesets && !hasNonEmptyChangesets: {

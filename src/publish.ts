@@ -58,23 +58,25 @@ async function createRelease(
 type PublishedPackage = { name: string; version: string };
 
 type PublishResult =
-  | { published: true; publishedPackages: PublishedPackage[] }
-  | { published: false };
+  | {
+      published: true;
+      publishedPackages: PublishedPackage[];
+      exitCode?: number;
+    }
+  | {
+      published: false;
+      exitCode?: number;
+    };
 
 export async function runScriptPublish(
   script: string,
   ctx: ActionContext,
 ): Promise<PublishResult> {
-  const [publishCommand, ...publishArgs] = script.split(/\s+/);
-
-  const changesetPublishOutput = await getExecOutput(
-    publishCommand,
-    publishArgs,
-    {
-      cwd: ctx.cwd,
-      env: { ...process.env, GITHUB_TOKEN: ctx.inputs.githubToken },
-    },
-  );
+  const changesetPublishOutput = await getExecOutput(script, undefined, {
+    cwd: ctx.cwd,
+    ignoreReturnCode: true,
+    env: { ...process.env, GITHUB_TOKEN: ctx.inputs.githubToken },
+  });
 
   const { packages, tool } = await getPackages(ctx.cwd);
   const releasedPackages: Package[] = [];
@@ -150,10 +152,11 @@ export async function runScriptPublish(
         name: pkg.packageJson.name,
         version: pkg.packageJson.version,
       })),
+      exitCode: changesetPublishOutput.exitCode,
     };
   }
 
-  return { published: false };
+  return { published: false, exitCode: changesetPublishOutput.exitCode };
 }
 
 export async function runGitHubPublish(
