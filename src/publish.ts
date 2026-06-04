@@ -11,7 +11,7 @@ import { detect } from "package-manager-detector";
 import * as tar from "tar";
 import { getChangelogEntry } from "./changelog.ts";
 import type { ActionContext } from "./context.ts";
-import { remoteHeadExists, remoteTagList, setUser } from "./git-utils.ts";
+import { remoteTagList, setUser } from "./git-utils.ts";
 import { type Octokit, setupOctokit } from "./octokit.ts";
 import { packPackage } from "./pack.ts";
 import { getGitHubRemoteUrl, isErrorWithCode } from "./utils.ts";
@@ -243,23 +243,23 @@ export async function runGitHubPublish(
     }),
   );
 
-  const repoFound =
-    (await remoteHeadExists(gitDir)) ||
-    (await octokit.rest.repos
-      .get({
-        owner: repositoryOwner,
-        repo: repositoryRepo,
-      })
-      .catch((err) => {
-        if (err?.status === 404 || err?.status === 403) {
-          return false;
-        }
-        throw err;
-      }));
-  if (!repoFound) {
-    throw new Error(
-      `Repository ${repository} does not exist or is inaccessible.`,
-    );
+  try {
+    await octokit.rest.repos.get({
+      owner: repositoryOwner,
+      repo: repositoryRepo,
+    });
+  } catch (err) {
+    if (
+      typeof err === "object" &&
+      err &&
+      "status" in err &&
+      (err?.status === 404 || err?.status === 403)
+    ) {
+      throw new Error(
+        `Repository ${repository} does not exist or is inaccessible.`,
+      );
+    }
+    throw err;
   }
   core.info(`[INFO] repository accessible: ${repository}`);
 
